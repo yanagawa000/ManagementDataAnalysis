@@ -4,6 +4,8 @@ from module_yoshinzandaka import preprocess_yoshin
 from module_motocho import preprocess_motocho
 from module_MACROSSzaiko import preprocess_zaiko_step1
 from module_shiharaitegata import preprocess_shiharai_tegata
+from module_bs_classification import load_bs_classification
+from module_location import load_location_data
 
 def get_user_date() -> pd.Timestamp:
     """
@@ -154,6 +156,46 @@ def main():
         print("\n--- 全てのDataFrameをマージします ---")
         merged_df = pd.concat(all_dataframes, ignore_index=True)
         print(f"情報: {len(all_dataframes)}個のDataFrameをマージしました。総行数: {len(merged_df)}")
+
+        # --- 分類情報の読み込みとマージ ---
+        print("\n--- 分類情報をマージします ---")
+        classification_file = '部門別BS対象科目.csv'
+        df_classification = load_bs_classification(classification_file)
+        
+        if df_classification is not None:
+            # merged_dfの「勘定科目コード」を文字列型に変換してからマージ
+            merged_df['勘定科目コード'] = merged_df['勘定科目コード'].astype(str)
+            df_classification['勘定科目コード'] = df_classification['勘定科目コード'].astype(str)
+            
+            merged_df = pd.merge(
+                merged_df, 
+                df_classification, 
+                on='勘定科目コード', 
+                how='left'
+            )
+            print("情報: 分類情報（分類1, 分類2, 分類3）をマージしました。")
+        else:
+            print("警告: 分類情報のマージに失敗したため、分類列は追加されませんでした。")
+        
+        # --- 場所情報の読み込みとマージ ---
+        print("\n--- 場所情報をマージします ---")
+        location_file = '部門コード_場所.csv'
+        df_location = load_location_data(location_file)
+
+        if df_location is not None:
+            # merged_dfとdf_locationの「部門コード」を文字列型に統一
+            merged_df['部門コード'] = merged_df['部門コード'].astype(str)
+            df_location['部門コード'] = df_location['部門コード'].astype(str)
+
+            merged_df = pd.merge(
+                merged_df,
+                df_location,
+                on='部門コード',
+                how='left'
+            )
+            print("情報: 場所情報をマージしました。")
+        else:
+            print("警告: 場所情報のマージに失敗したため、「場所」列は追加されませんでした。")
 
         # 見やすさのために日付と部門コードでソート
         merged_df.sort_values(by=['日付', '部門コード'], na_position='last', inplace=True)
