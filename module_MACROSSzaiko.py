@@ -63,6 +63,19 @@ def preprocess_zaiko_step1(file_path: str) -> Tuple[Optional[pd.DataFrame], Opti
             '在庫金額': '金額'
         }, inplace=True)
 
+        # 金額カラムを頑健な方法で数値に変換
+        # 通貨記号、カンマ、空白などの非数値文字を削除
+        cleaned_series = df_work['金額'].astype(str).str.replace(r'[^\d.-]', '', regex=True)
+        
+        # クリーニング後に空文字列になった場合は、数値変換のためにNoneに置換
+        cleaned_series.replace('', None, inplace=True)
+        
+        # 数値に変換し、変換不能な値は0にする
+        df_work['金額'] = pd.to_numeric(
+            cleaned_series,
+            errors='coerce'
+        ).fillna(0)
+
         bumon_map = {'H101210': '原料部_輸', 'H101310': '海外部'}
         df_work['部門名'] = df_work['部門コード'].map(bumon_map).fillna(df_work['部門名'])
         

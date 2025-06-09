@@ -1,11 +1,12 @@
 '''支払手形データの前処理モジュール'''
 import pandas as pd
 
-def preprocess_shiharai_tegata(file_path: str) -> pd.DataFrame:
+def preprocess_shiharai_tegata(file_path: str, target_date: pd.Timestamp) -> pd.DataFrame:
     """支払手形CSVファイルを読み込み、列抽出、カラム名変更、固定列追加、列順序変更を行います。
 
     Args:
         file_path (str): CSVファイルのパス。
+        target_date (pd.Timestamp): 処理対象の基準日。
 
     Returns:
         pd.DataFrame: 処理後のDataFrame。
@@ -57,7 +58,7 @@ def preprocess_shiharai_tegata(file_path: str) -> pd.DataFrame:
         df_extracted.rename(columns=actual_rename_map, inplace=True)
         
         # 新しいカラムの追加
-        df_extracted['日付'] = pd.NA # または None や np.nan も使えるが、pd.NAが推奨される場合がある
+        df_extracted['日付'] = target_date
         df_extracted['勘定科目コード'] = 'BS2003'
         df_extracted['勘定科目名'] = '★支払手形'
         
@@ -95,8 +96,9 @@ def preprocess_shiharai_tegata(file_path: str) -> pd.DataFrame:
 if __name__ == '__main__':
     # モジュールのテスト用コード
     csv_file = '2024年8月度データ/支払手形_202408.csv' # 添付ファイル名を指定
+    target_date_for_test = pd.Timestamp('2024-08-01')
     output_csv_file = 'processed_shiharaitegata_output.csv' # 出力ファイル名
-    processed_data = preprocess_shiharai_tegata(csv_file)
+    processed_data = preprocess_shiharai_tegata(csv_file, target_date_for_test)
 
     if not processed_data.empty:
         print(f"'{csv_file}' の前処理後 (カラム順序変更済み) のデータの最初の10行:")
