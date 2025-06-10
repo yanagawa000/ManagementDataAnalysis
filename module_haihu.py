@@ -1,5 +1,7 @@
 import pandas as pd
 from typing import Optional
+import os
+from datetime import datetime
 
 def preprocess_haihu(file_path: str, target_date: pd.Timestamp) -> Optional[pd.DataFrame]:
     """
@@ -86,30 +88,36 @@ def preprocess_haihu(file_path: str, target_date: pd.Timestamp) -> Optional[pd.D
 
 if __name__ == '__main__':
     # モジュールのテスト用コード
-    csv_file = '2024年8月度データ/配賦率.csv'
-    target_date_for_test = pd.Timestamp('2024-08-01')
-    output_csv_file = 'processed_haihu_output.csv' # 出力ファイル名
+    # --- デバッグ用セットアップ ---
+    DEBUG_DIR = 'dbug'
+    if not os.path.exists(DEBUG_DIR):
+        os.makedirs(DEBUG_DIR)
     
-    print(f"--- '{csv_file}' の処理を開始します ---")
-    processed_df = preprocess_haihu(csv_file, target_date_for_test)
-    print("------------------------------------")
+    def save_df_to_debug(df: pd.DataFrame, name: str):
+        """DataFrameをdbugフォルダに保存する。"""
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{timestamp}_{name}.csv"
+            path = os.path.join(DEBUG_DIR, filename)
+            try:
+                df.to_csv(path, index=False, encoding='utf-8-sig')
+                print(f"[DEBUG] DataFrame '{name}' を '{path}' に保存しました。")
+            except Exception as e:
+                print(f"[DEBUG] DataFrame '{name}' の保存中にエラー: {e}")
 
-    if processed_df is not None:
-        print("\n--- 処理後のDataFrame（全体） ---")
-        pd.set_option('display.max_rows', None) # 全ての行を表示
-        print(processed_df)
-        pd.reset_option('display.max_rows')
-        
-        print("\n--- 処理後のDataFrameのカラム一覧 ---")
-        print(processed_df.columns.tolist())
-        
-        print(f"\n業務量割合の合計: {processed_df['業務量割合'].sum()}")
-        print(f"配賦率の合計: {processed_df['配賦率'].sum()}")
+    test_file = '2024年8月度データ/配賦率.csv'
+    test_date = pd.to_datetime('2024/08/01')
+    
+    print(f"--- '{test_file}' の処理をテストします ---")
+    df_result = preprocess_haihu(test_file, test_date)
+    print("---------------------------------------")
 
-        try:
-            processed_df.to_csv(output_csv_file, index=False, encoding='utf-8-sig')
-            print(f"\n成功: 処理結果を '{output_csv_file}' に出力しました。")
-        except Exception as e:
-            print(f"\nエラー: CSVファイル '{output_csv_file}' の出力中にエラーが発生しました: {e}")
+    if df_result is not None:
+        print("\n--- 処理成功: 配賦率データ（先頭5行） ---")
+        print(df_result.head())
+        print(f"\nデータ件数: {len(df_result)}件")
+        # デバッグ用にCSV出力
+        save_df_to_debug(df_result, 'module_haihu_result')
+        
     else:
-        print(f"\n'{csv_file}' の処理に失敗しました。")
+        print(f"\n--- '{test_file}' の処理に失敗しました ---")

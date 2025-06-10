@@ -246,6 +246,22 @@ def main():
         else:
             print("警告: 場所情報データが読み込めなかったため、部門名と場所は付与されませんでした。")
 
+        # --- 「分類1」と「部門名」が空欄のレコードを除外 ---
+        print("\n--- 「分類1」と「部門名」が空欄のレコードを除外します ---")
+        initial_rows = len(merged_df)
+        
+        # NaN値を持つ行を除外
+        merged_df.dropna(subset=['分類1', '部門名'], inplace=True)
+        
+        # 空白文字列を持つ行を除外
+        if '分類1' in merged_df.columns:
+             merged_df = merged_df[merged_df['分類1'] != '']
+        if '部門名' in merged_df.columns:
+             merged_df = merged_df[merged_df['部門名'] != '']
+        
+        final_rows = len(merged_df)
+        print(f"情報: {initial_rows - final_rows}件のレコードを除外しました。")
+
         # 見やすさのために日付と部門コードでソート
         merged_df.sort_values(by=['日付', '部門コード'], na_position='last', inplace=True)
         

@@ -1,5 +1,7 @@
 '''支払手形データの前処理モジュール'''
 import pandas as pd
+import os
+from datetime import datetime
 
 def preprocess_shiharai_tegata(file_path: str, target_date: pd.Timestamp) -> pd.DataFrame:
     """支払手形CSVファイルを読み込み、列抽出、カラム名変更、固定列追加、列順序変更を行います。
@@ -95,22 +97,36 @@ def preprocess_shiharai_tegata(file_path: str, target_date: pd.Timestamp) -> pd.
 
 if __name__ == '__main__':
     # モジュールのテスト用コード
-    csv_file = '2024年8月度データ/支払手形_202408.csv' # 添付ファイル名を指定
-    target_date_for_test = pd.Timestamp('2024-08-01')
-    output_csv_file = 'processed_shiharaitegata_output.csv' # 出力ファイル名
-    processed_data = preprocess_shiharai_tegata(csv_file, target_date_for_test)
+    # --- デバッグ用セットアップ ---
+    DEBUG_DIR = 'dbug'
+    if not os.path.exists(DEBUG_DIR):
+        os.makedirs(DEBUG_DIR)
 
-    if not processed_data.empty:
-        print(f"'{csv_file}' の前処理後 (カラム順序変更済み) のデータの最初の10行:")
-        print(processed_data.head(10))
-        # print(f"'{csv_file}' の前処理後 (カラム順序変更済み) のデータの最後の10行:") # CSV出力時は大量表示をコメントアウトも検討
-        print(processed_data.tail(10))
-    #     print(f"カラム一覧: {processed_data.columns.tolist()}")
-        
-    #     try:
-    #         processed_data.to_csv(output_csv_file, index=False, encoding='utf-8-sig')
-    #         print(f"処理結果を '{output_csv_file}' に出力しました。")
-    #     except Exception as e:
-    #         print(f"CSVファイル '{output_csv_file}' の出力中にエラーが発生しました: {e}")
-    # else:
-    #     print(f"'{csv_file}' の処理結果が空、必要なカラムが見つからない、またはエンコーディングエラーが発生しました。CSV出力は行われませんでした。")
+    def save_df_to_debug(df: pd.DataFrame, name: str):
+        """DataFrameをdbugフォルダに保存する。"""
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{timestamp}_{name}.csv"
+            path = os.path.join(DEBUG_DIR, filename)
+            try:
+                df.to_csv(path, index=False, encoding='utf-8-sig')
+                print(f"[DEBUG] DataFrame '{name}' を '{path}' に保存しました。")
+            except Exception as e:
+                print(f"[DEBUG] DataFrame '{name}' の保存中にエラー: {e}")
+
+    # テスト用のファイルパスと日付
+    test_tegata_path = '2024年8月度データ/支払手形_202408.csv'
+    test_target_date = pd.to_datetime('2024-08-01')
+
+    print(f"--- '{test_tegata_path}' の処理を開始します ---")
+    df_tegata = preprocess_shiharai_tegata(test_tegata_path, test_target_date)
+    print("------------------------------------------")
+
+    if df_tegata is not None:
+        print("\n--- 処理成功: 支払手形データ（全体）---")
+        print(df_tegata)
+        print("\n--- データ型 ---")
+        print(df_tegata.dtypes)
+        save_df_to_debug(df_tegata, 'module_shiharaitegata_result')
+    else:
+        print(f"--- '{test_tegata_path}' の処理に失敗しました ---")

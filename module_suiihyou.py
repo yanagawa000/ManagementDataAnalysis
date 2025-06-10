@@ -1,6 +1,8 @@
 '''推移表の前処理モジュール'''
 import pandas as pd
 from typing import Tuple, Optional
+import os
+from datetime import datetime
 
 def preprocess_csv(file_path: str, skip_rows: int = 9) -> Tuple[Optional[pd.DataFrame], pd.Series]:
     """CSVファイルを読み込み、前処理を行います。BS1043の日付ごと合計値を計算し、指定の勘定科目を削除します。
@@ -109,15 +111,41 @@ def preprocess_csv(file_path: str, skip_rows: int = 9) -> Tuple[Optional[pd.Data
         return None, pd.Series(dtype='float64')
 
 if __name__ == '__main__':
-    csv_file = '2024年8月度データ/推移表_貸借対照表_部門別_2024_上期.csv'
-    processed_data, sum_series = preprocess_csv(csv_file)
+    # モジュールのテスト用コード
+    # --- デバッグ用セットアップ ---
+    DEBUG_DIR = 'dbug'
+    if not os.path.exists(DEBUG_DIR):
+        os.makedirs(DEBUG_DIR)
 
-    if processed_data is not None:
-        print("\n--- 処理後のDataFrame（先頭5行） ---")
-        print(processed_data.head())
-        print(f"\nカラム一覧: {processed_data.columns.tolist()}")
+    def save_df_to_debug(df: pd.DataFrame, name: str):
+        """DataFrameをdbugフォルダに保存する。"""
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{timestamp}_{name}.csv"
+            path = os.path.join(DEBUG_DIR, filename)
+            try:
+                df.to_csv(path, index=False, encoding='utf-8-sig')
+                print(f"[DEBUG] DataFrame '{name}' を '{path}' に保存しました。")
+            except Exception as e:
+                print(f"[DEBUG] DataFrame '{name}' の保存中にエラー: {e}")
+
+    # テスト用のファイルパス
+    test_suiihyou_path = '2024年8月度データ/推移表_貸借対照表_部門別_2024_上期.csv'
+
+    print(f"--- '{test_suiihyou_path}' の処理を開始します ---")
+    df, sum_series = preprocess_csv(test_suiihyou_path)
+    print("---------------------------------------------")
+
+    if df is not None:
+        print("\n--- 処理成功: 推移表データ（先頭5行）---")
+        print(df.head())
+        print("\n--- データ型 ---")
+        print(df.dtypes)
+        save_df_to_debug(df, 'module_suiihyou_result_df')
+
+        print("\n--- 処理成功: BS1043 合計値シリーズ ---")
+        print(sum_series)
+        # Seriesもデバッグ出力する場合はDataFrameに変換する
+        save_df_to_debug(sum_series.to_frame(name='BS1043_sum'), 'module_suiihyou_result_series')
     else:
-        print(f"'{csv_file}' の処理結果が空です。")
-        
-    print("\n--- BS1043の日付ごと合計金額 ---")
-    print(sum_series)
+        print(f"--- '{test_suiihyou_path}' の処理に失敗しました ---")
