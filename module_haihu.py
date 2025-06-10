@@ -36,18 +36,7 @@ def preprocess_haihu(file_path: str, target_date: pd.Timestamp) -> Optional[pd.D
         # 業務量割合を数値型に変換
         df_melted['業務量割合'] = pd.to_numeric(df_melted['業務量割合'], errors='coerce').fillna(0)
 
-        # 4. 業務量割合の合計を計算
-        total_business_volume = df_melted['業務量割合'].sum()
-        
-        if total_business_volume == 0:
-            print("警告: 業務量割合の合計が0です。配賦率は計算できません。")
-            df_melted['配賦率'] = 0.0
-        else:
-            # 5. 配賦率カラムの計算と追加
-            df_melted['配賦率'] = df_melted['業務量割合'] / total_business_volume
-        
-        # --- 場所別配賦の処理 ---
-        # 1. 場所別配賦グループの定義
+        # 4. 場所別配賦グループの定義
         group_map = {
             'H102200': '本店・東京支店', 'H101100': '本店・東京支店', 'H101210': '本店・東京支店',
             'H101310': '本店・東京支店', 'H104100': '本店・東京支店', 'H102100': '本店・東京支店',
@@ -56,17 +45,33 @@ def preprocess_haihu(file_path: str, target_date: pd.Timestamp) -> Optional[pd.D
             'O502100': '大阪支店', 'O502200': '大阪支店', 'O501100': '大阪支店', 'O501200': '大阪支店',
             'F602100': '福岡支店', 'F602200': '福岡支店', 'F601100': '福岡支店', 'F601200': '福岡支店'
         }
-        
-        # 2. グループの割り当てとフィルタリング
-        df_melted['場所別配賦グループ'] = df_melted['部門コード'].map(group_map).fillna('その他')
-        df_melted = df_melted[df_melted['場所別配賦グループ'] != 'その他'].copy()
 
-        # 3. 場所別配賦率の計算
+        # 5. group_map に存在する部門コードのみにフィルタリング
+        df_melted = df_melted[df_melted['部門コード'].isin(group_map.keys())].copy()
+
+        if df_melted.empty:
+            print("警告: group_mapに一致する部門コードが見つかりませんでした。")
+            return None
+
+        # 6. フィルタリングされたデータで業務量割合の合計を計算
+        total_business_volume = df_melted['業務量割合'].sum()
+
+        if total_business_volume == 0:
+            print("警告: 業務量割合の合計が0です。配賦率は計算できません。")
+            df_melted['配賦率'] = 0.0
+        else:
+            # 7. 配賦率カラムの計算と追加
+            df_melted['配賦率'] = df_melted['業務量割合'] / total_business_volume
+        
+        # --- 場所別配賦の処理 ---
+        # 8. 場所別配賦グループの割り当て
+        df_melted['場所別配賦グループ'] = df_melted['部門コード'].map(group_map)
+        
+        # 9. 場所別配賦率の計算
         # グループごとの配賦率合計を計算
         group_sum = df_melted.groupby('場所別配賦グループ')['配賦率'].transform('sum')
         
         # ゼロ除算を避ける
-        # group_sumが0の場所は、場所別配賦率も0とする
         df_melted['場所別配賦率'] = df_melted['配賦率'].divide(group_sum).fillna(0)
 
         print("情報: 配賦率データの処理が完了しました。")
