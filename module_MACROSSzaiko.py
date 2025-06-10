@@ -2,6 +2,7 @@
 import pandas as pd
 from datetime import datetime
 from typing import Optional, Tuple
+import os
 
 def preprocess_zaiko_step1(file_path: str) -> Tuple[Optional[pd.DataFrame], Optional[datetime]]:
     """在庫一覧CSVを読み込み、一連の前処理を実行して整形されたDataFrameを返します。
@@ -104,24 +105,37 @@ def preprocess_zaiko_step1(file_path: str) -> Tuple[Optional[pd.DataFrame], Opti
         return None, None
 
 if __name__ == '__main__':
-    # モジュールのテスト用コード
-    csv_file = '2024年8月度データ/在庫一覧_202408.csv'
-    
-    print(f"--- '{csv_file}' の処理を開始します ---")
-    processed_data, kijunbi_date = preprocess_zaiko_step1(csv_file)
-    print("------------------------------------")
+    # このモジュールが直接実行された場合のテストコード
+    # --- デバッグ用セットアップ ---
+    DEBUG_DIR = 'dbug'
+    if not os.path.exists(DEBUG_DIR):
+        os.makedirs(DEBUG_DIR)
 
-    if processed_data is not None:
-        print("\n[処理結果サマリー]")
-        if kijunbi_date:
-            print(f"  格納された変数（月初の日付）: {kijunbi_date.strftime('%Y-%m-%d')}")
-        else:
-            print("  月初の日付は取得できませんでした。")
-            
-        print("\n--- 処理後のDataFrameの先頭20行 ---")
-        print(processed_data.head(20))
-        
-        print("\n--- 処理後のDataFrameのカラム一覧 ---")
-        print(processed_data.columns.tolist())
+    def save_df_to_debug(df: pd.DataFrame, name: str):
+        """DataFrameをdbugフォルダに保存する。"""
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{timestamp}_{name}.csv"
+            path = os.path.join(DEBUG_DIR, filename)
+            try:
+                df.to_csv(path, index=False, encoding='utf-8-sig')
+                print(f"[DEBUG] DataFrame '{name}' を '{path}' に保存しました。")
+            except Exception as e:
+                print(f"[DEBUG] DataFrame '{name}' の保存中にエラー: {e}")
+
+    # テスト用のファイルパス
+    test_zaiko_path = '2024年8月度データ/在庫一覧_202408.csv'
+    
+    print(f"--- '{test_zaiko_path}' の処理を開始します ---")
+    df_zaiko, zaiko_date = preprocess_zaiko_step1(test_zaiko_path)
+    print("-----------------------------------------")
+
+    if df_zaiko is not None:
+        print("\n--- 処理成功: 在庫データ（先頭5行） ---")
+        print(df_zaiko.head())
+        print(f"\n取得した基準日: {zaiko_date}")
+        print("\n--- データ型 ---")
+        print(df_zaiko.dtypes)
+        save_df_to_debug(df_zaiko, 'module_MACROSSzaiko_result')
     else:
-        print(f"\n'{csv_file}' の処理に失敗しました。DataFrameは生成されませんでした。")
+        print(f"--- '{test_zaiko_path}' の処理に失敗しました ---")

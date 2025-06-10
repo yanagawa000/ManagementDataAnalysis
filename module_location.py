@@ -1,5 +1,7 @@
 import pandas as pd
 from typing import Optional
+import os
+from datetime import datetime
 
 def load_location_data(file_path: str) -> Optional[pd.DataFrame]:
     """
@@ -38,6 +40,23 @@ def load_location_data(file_path: str) -> Optional[pd.DataFrame]:
 
 if __name__ == '__main__':
     # モジュールのテスト用コード
+    # --- デバッグ用セットアップ ---
+    DEBUG_DIR = 'dbug'
+    if not os.path.exists(DEBUG_DIR):
+        os.makedirs(DEBUG_DIR)
+
+    def save_df_to_debug(df: pd.DataFrame, name: str):
+        """DataFrameをdbugフォルダに保存する。"""
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{timestamp}_{name}.csv"
+            path = os.path.join(DEBUG_DIR, filename)
+            try:
+                df.to_csv(path, index=False, encoding='utf-8-sig')
+                print(f"[DEBUG] DataFrame '{name}' を '{path}' に保存しました。")
+            except Exception as e:
+                print(f"[DEBUG] DataFrame '{name}' の保存中にエラー: {e}")
+
     csv_file = '部門コード_場所.csv'
     
     print(f"--- '{csv_file}' の処理を開始します ---")
@@ -51,5 +70,6 @@ if __name__ == '__main__':
         print(location_df.columns.tolist())
         print("\n--- データ型 ---")
         print(location_df.dtypes)
+        save_df_to_debug(location_df, 'module_location_result')
     else:
         print(f"\n'{csv_file}' の処理に失敗しました。") 

@@ -1,6 +1,8 @@
 '''与信残高表データの前処理モジュール'''
 import pandas as pd
 from typing import Optional, Any, Tuple
+import os
+from datetime import datetime
 
 def get_first_lines(file_path: str, num_lines: int) -> Tuple[list[str], str]:
     """ファイルの先頭から指定された行数を読み込み、エンコーディングを自動判別します。"""
@@ -95,20 +97,37 @@ def preprocess_yoshin(file_path: str) -> Tuple[Optional[pd.DataFrame], Optional[
 
 
 if __name__ == '__main__':
-    csv_file = '2024年8月度データ/与信残高表_202408.csv'
-    
-    print(f"--- '{csv_file}' の処理を開始します ---")
-    processed_df, meta_value = preprocess_yoshin(csv_file)
-    print("------------------------------------")
+    # モジュールのテスト用コード
+    # --- デバッグ用セットアップ ---
+    DEBUG_DIR = 'dbug'
+    if not os.path.exists(DEBUG_DIR):
+        os.makedirs(DEBUG_DIR)
 
-    if processed_df is not None:
-        print("\n[取得したメタ情報]")
-        print(f"  5行2列目の値: {meta_value}")
-        
-        print("\n--- 処理後のDataFrame（先頭5行） ---")
-        print(processed_df.head())
-        
-        print("\n--- カラム一覧 ---")
-        print(processed_df.columns.tolist())
+    def save_df_to_debug(df: pd.DataFrame, name: str):
+        """DataFrameをdbugフォルダに保存する。"""
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{timestamp}_{name}.csv"
+            path = os.path.join(DEBUG_DIR, filename)
+            try:
+                df.to_csv(path, index=False, encoding='utf-8-sig')
+                print(f"[DEBUG] DataFrame '{name}' を '{path}' に保存しました。")
+            except Exception as e:
+                print(f"[DEBUG] DataFrame '{name}' の保存中にエラー: {e}")
+
+    # テスト用のファイルパス
+    test_yoshin_path = '2024年8月度データ/与信残高表_202408.csv'
+
+    print(f"--- '{test_yoshin_path}' の処理を開始します ---")
+    df, date = preprocess_yoshin(test_yoshin_path)
+    print("---------------------------------------------")
+
+    if df is not None:
+        print("\n--- 処理成功: 与信残高表データ（先頭5行）---")
+        print(df.head())
+        print(f"\n取得した日付: {date}")
+        print("\n--- データ型 ---")
+        print(df.dtypes)
+        save_df_to_debug(df, 'module_yoshinzandaka_result')
     else:
-        print(f"\n'{csv_file}' の処理に失敗しました。")
+        print(f"--- '{test_yoshin_path}' の処理に失敗しました ---")

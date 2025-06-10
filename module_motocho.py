@@ -1,6 +1,8 @@
 '''MAC元帳データの前処理モジュール'''
 import pandas as pd
 from typing import Optional, Tuple
+import os
+from datetime import datetime
 
 def _get_latest_record(df: pd.DataFrame, code: str) -> pd.DataFrame:
     """
@@ -143,24 +145,41 @@ def preprocess_motocho(file_path: str) -> Tuple[Optional[pd.DataFrame], Optional
 
 
 if __name__ == '__main__':
-    csv_file = '2024年8月度データ/MAC元帳202408.csv'
+    # モジュールのテスト用コード
+    # --- デバッグ用セットアップ ---
+    DEBUG_DIR = 'dbug'
+    if not os.path.exists(DEBUG_DIR):
+        os.makedirs(DEBUG_DIR)
+
+    def save_df_to_debug(df: pd.DataFrame, name: str):
+        """DataFrameをdbugフォルダに保存する。"""
+        if isinstance(df, pd.DataFrame) and not df.empty:
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            filename = f"{timestamp}_{name}.csv"
+            path = os.path.join(DEBUG_DIR, filename)
+            try:
+                df.to_csv(path, index=False, encoding='utf-8-sig')
+                print(f"[DEBUG] DataFrame '{name}' を '{path}' に保存しました。")
+            except Exception as e:
+                print(f"[DEBUG] DataFrame '{name}' の保存中にエラー: {e}")
+
+    # テスト用のファイルパス
+    test_motocho_path = '2024年8月度データ/MAC元帳202408.csv'
     
-    print(f"--- '{csv_file}' の処理を開始します ---")
-    df1, df2 = preprocess_motocho(csv_file)
-    print("------------------------------------")
+    print(f"--- '{test_motocho_path}' の処理を開始します ---")
+    df1, df2 = preprocess_motocho(test_motocho_path)
+    print("------------------------------------------")
 
-    if df1 is not None and df2 is not None:
-        print("\n--- '109801' の最新・最大レコード ---")
+    if df1 is not None:
+        print("\n--- 処理成功: df_motocho_1 (109801) ---")
         print(df1)
-        
-        print("\n--- '491701' の最新・最大レコード ---")
-        print(df2)
-
-        if not df1.empty:
-            print("\n\nカラム一覧:")
-            print(df1.columns.tolist())
-        elif not df2.empty:
-            print("\n\nカラム一覧:")
-            print(df2.columns.tolist())
+        save_df_to_debug(df1, 'module_motocho_109801_result')
     else:
-        print(f"\n'{csv_file}' の処理に失敗しました。")
+        print("\n--- df_motocho_1 (109801) の処理に失敗、またはデータなし ---")
+
+    if df2 is not None:
+        print("\n--- 処理成功: df_motocho_2 (491701) ---")
+        print(df2)
+        save_df_to_debug(df2, 'module_motocho_491701_result')
+    else:
+        print("\n--- df_motocho_2 (491701) の処理に失敗、またはデータなし ---")
