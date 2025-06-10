@@ -14,7 +14,7 @@ def load_location_data(file_path: str) -> Optional[pd.DataFrame]:
     try:
         df = pd.read_csv(file_path, encoding='utf-8-sig', dtype={'部門コード': str})
         
-        required_columns = ['部門コード', '場所']
+        required_columns = ['部門コード', '部門名', '場所']
         if not set(required_columns).issubset(df.columns):
             # cp932で再試行
             try:

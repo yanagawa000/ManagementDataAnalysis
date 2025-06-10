@@ -6,6 +6,8 @@ from module_MACROSSzaiko import preprocess_zaiko_step1
 from module_shiharaitegata import preprocess_shiharai_tegata
 from module_bs_classification import load_bs_classification
 from module_location import load_location_data
+from module_haihu import preprocess_haihu
+from module_haifu_keisan import execute_allocation
 
 def get_user_date() -> pd.Timestamp:
     """
@@ -102,9 +104,9 @@ def main():
         print("\n[結果] MACROSS在庫データの処理に失敗しました。")
     print("--- [4/5] MACROSS在庫データの処理を完了しました ---\n")
 
-    # --- 商品評価損の計算 ---
+    # --- 特販部在庫の計算 ---
     if sum_bs1043 is not None and (df_motocho_2 is not None and not df_motocho_2.empty) and (df_zaiko is not None and not df_zaiko.empty):
-        print("--- [追加処理] 商品評価損の計算を開始します ---")
+        print("--- [追加処理] 特販部在庫の計算を開始します ---")
         try:
             # df_motocho_2は1行しかないので、.iloc[0]で値を取得
             motocho_value = df_motocho_2['金額'].iloc[0]
@@ -112,30 +114,30 @@ def main():
             # df_zaikoの金額を合計
             zaiko_total_value = df_zaiko['金額'].sum()
             
-            # 評価損を計算
-            hyoukason = sum_bs1043 - motocho_value - zaiko_total_value
+            # 特販部在庫を計算
+            tokuhanzaiko = sum_bs1043 - motocho_value - zaiko_total_value
             
             print(f"[計算内訳] BS1043合計: {sum_bs1043:,.0f}")
             print(f"[計算内訳] 元帳(491701)金額: {motocho_value:,.0f}")
             print(f"[計算内訳] 在庫合計金額: {zaiko_total_value:,.0f}")
-            print(f"[結果] 計算された商品評価損: {hyoukason:,.0f}")
+            print(f"[結果] 計算された特販部在庫: {tokuhanzaiko:,.0f}")
 
             # 新しいDataFrameを作成
-            df_hyoukason = pd.DataFrame({
+            df_tokuhanzaiko = pd.DataFrame({
                 '日付': [zaiko_date],
                 '部門コード': ['H102200'],
                 '部門名': ['本店特販部'],
                 '勘定科目コード': ['BS1043'],
                 '勘定科目名': ['★商品'],
-                '金額': [hyoukason]
+                '金額': [tokuhanzaiko]
             })
             
-            all_dataframes.append(df_hyoukason)
-            print("情報: 商品評価損のデータをDataFrameとして追加しました。")
+            all_dataframes.append(df_tokuhanzaiko)
+            print("情報: 特販部在庫のデータをDataFrameとして追加しました。")
 
         except Exception as e:
-            print(f"エラー: 商品評価損の計算中にエラーが発生しました: {e}")
-        print("--- [追加処理] 商品評価損の計算を完了しました ---\n")
+            print(f"エラー: 特販部在庫の計算中にエラーが発生しました: {e}")
+        print("--- [追加処理] 特販部在庫の計算を完了しました ---\n")
 
     # --- 5. 支払手形データの処理 ---
     print("--- [5/5] 支払手形データの処理を開始します ---")
@@ -177,25 +179,72 @@ def main():
         else:
             print("警告: 分類情報のマージに失敗したため、分類列は追加されませんでした。")
         
-        # --- 場所情報の読み込みとマージ ---
+        # --- 場所情報の読み込みと事前マージ（共通レコード分離のため） ---
         print("\n--- 場所情報をマージします ---")
         location_file = '部門コード_場所.csv'
         df_location = load_location_data(location_file)
 
         if df_location is not None:
-            # merged_dfとdf_locationの「部門コード」を文字列型に統一
-            merged_df['部門コード'] = merged_df['部門コード'].astype(str)
             df_location['部門コード'] = df_location['部門コード'].astype(str)
-
-            merged_df = pd.merge(
-                merged_df,
-                df_location,
-                on='部門コード',
-                how='left'
-            )
-            print("情報: 場所情報をマージしました。")
+            merged_df['部門コード'] = merged_df['部門コード'].astype(str)
+            # 共通レコード分離に必要な「場所」列のみを一時的にマージする
+            merged_df = pd.merge(merged_df, df_location[['部門コード', '場所']], on='部門コード', how='left')
+            print("情報: 共通レコード分離のために場所情報を一時的にマージしました。")
         else:
-            print("警告: 場所情報のマージに失敗したため、「場所」列は追加されませんでした。")
+            print("警告: 場所情報ファイルが読み込めなかったため、配賦計算は正しく行われない可能性があります。")
+
+        # 「場所」が '全店共通' または '場所共通' のレコードを分離
+        # この処理のために、事前に場所情報をマージしておく必要がある
+        is_zen_kyoutuu = merged_df['場所'] == '全店共通'
+        is_basho_kyoutuu = merged_df['場所'] == '場所共通'
+        
+        df_zen_kyoutuu = merged_df[is_zen_kyoutuu].copy()
+        df_basho_kyoutuu = merged_df[is_basho_kyoutuu].copy()
+        
+        # 元のDataFrameからは配賦対象の共通レコードと、重複を避けるため場所・部門名を削除
+        columns_to_drop = ['場所', '部門名']
+        df_main_data = merged_df.drop(columns=columns_to_drop)[~is_zen_kyoutuu & ~is_basho_kyoutuu].copy()
+
+        # 最終的にマージするデータフレームを格納するリスト
+        final_data_parts = [df_main_data]
+
+        print("\n--- 共通レコードの分離 ---")
+        print(f"情報: '全店共通' のレコードを {len(df_zen_kyoutuu)} 件分離しました。")
+        print(f"情報: '場所共通' のレコードを {len(df_basho_kyoutuu)} 件分離しました。")
+        print(f"情報: 分離後のメインデータは {len(df_main_data)} 件になりました。")
+
+        # --- 配賦率データの準備 ---
+        print("\n--- 配賦率データを読み込みます ---")
+        haihu_path = '2024年8月度データ/配賦率.csv'
+        df_haihu = preprocess_haihu(haihu_path, target_date)
+        
+        # --- 配賦計算の実行 ---
+        if df_haihu is not None and not df_haihu.empty:
+            print("\n--- 配賦計算モジュールを実行します ---")
+            df_allocated = execute_allocation(df_zen_kyoutuu, df_basho_kyoutuu, df_haihu, target_date)
+            if not df_allocated.empty:
+                final_data_parts.append(df_allocated)
+                print("--- 配賦計算モジュールの実行が完了しました ---")
+            else:
+                print("情報: 配賦計算の結果、追加されるデータはありませんでした。")
+        else:
+            print("警告: 配賦率データの取得に失敗したか、データが空のため、配賦計算はスキップされました。")
+
+        # --- 全てのデータパーツを最終的に統合 ---
+        print("\n--- 全てのデータパーツを統合します ---")
+        print(f"情報: {len(final_data_parts)}個のデータパーツ（本体、配賦結果）をマージします。")
+        merged_df = pd.concat(final_data_parts, ignore_index=True)
+        print("情報: 最終的なデータ統合が完了しました。")
+
+        # --- 最後に部門名と場所の情報を再付与 ---
+        if df_location is not None:
+            print("\n--- 部門名と場所の情報を最終データに付与します ---")
+            # 既にdf_locationで型変換済みなので、merged_df側のみ実施
+            merged_df['部門コード'] = merged_df['部門コード'].astype(str)
+            merged_df = pd.merge(merged_df, df_location, on='部門コード', how='left')
+            print("情報: 部門名と場所の付与が完了しました。")
+        else:
+            print("警告: 場所情報データが読み込めなかったため、部門名と場所は付与されませんでした。")
 
         # 見やすさのために日付と部門コードでソート
         merged_df.sort_values(by=['日付', '部門コード'], na_position='last', inplace=True)
@@ -206,6 +255,22 @@ def main():
             print(f"成功: マージしたデータを '{output_path}' に出力しました。")
         except Exception as e:
             print(f"エラー: CSVファイルへの出力中にエラーが発生しました: {e}")
+        
+        # --- デバッグ用CSVを処理の最後に出力 ---
+        print("\n--- デバッグ用ファイルを出力します ---")
+        try:
+            output_path_zen = 'debug_df_zen_kyoutuu.csv'
+            df_zen_kyoutuu.to_csv(output_path_zen, index=False, encoding='utf-8-sig')
+            print(f"情報: デバッグ用ファイル '{output_path_zen}' を出力しました。")
+        except Exception as e:
+            print(f"エラー: zen_kyoutuu のデバッグCSV出力中にエラー: {e}")
+        
+        try:
+            output_path_basho = 'debug_df_basho_kyoutuu.csv'
+            df_basho_kyoutuu.to_csv(output_path_basho, index=False, encoding='utf-8-sig')
+            print(f"情報: デバッグ用ファイル '{output_path_basho}' を出力しました。")
+        except Exception as e:
+            print(f"エラー: basho_kyoutuu のデバッグCSV出力中にエラー: {e}")
 
     print("===================================")
     print("        全てのデータ処理が完了")
